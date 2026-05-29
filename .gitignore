@@ -1,0 +1,33 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# ---- Virtual environments ----
+venv/
+.venv/
+env/
+
+# ---- ML model downloads (large — keep out of git) ----
+# Vosk speech model (Day 4), DeepFace/FER weight caches, etc.
+models/
+vosk-model*/
+*.zip
+
+# ---- Music (don't commit copyrighted audio or bloat the repo) ----
+# The folders are kept via .gitkeep; the audio files are ignored.
+music/**/*.mp3
+music/**/*.wav
+music/**/*.m4a
+music/**/*.flac
+music/**/*.ogg
+
+# ---- OS junk ----
+.DS_Store
+Thumbs.db
+
+# ---- Editors ----
+.vscode/
+.idea/
+*.swp
