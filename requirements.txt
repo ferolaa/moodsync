@@ -1,17 +1,21 @@
-# MoodSync — Day 1 CORE dependencies (just enough to verify hardware)
-# Install these first, confirm the webcam/mic/speakers work, THEN add the ML libs.
-#
-# Recommended: Python 3.11 or 3.10 (mediapipe/FER/tensorflow lag the newest Python).
-
-opencv-python      # webcam capture
-pygame             # music playback (used from Day 2 onward)
-sounddevice        # mic recording + tone playback for the setup check
-numpy              # used everywhere
-
-# --- DO NOT install these yet. They are the fragile ones. Add them on the day you need them. ---
-# Day 2 (emotion):   fer        OR  deepface   (pick ONE; FER is lighter)
-# Day 3 (gestures):  mediapipe
-# Day 4 (voice):     vosk + sounddevice   (offline, demo-stable)
-#
-# Reason for staging: if tensorflow/mediapipe breaks the install, you can still
-# verify your hardware works instead of being stuck on Day 1.
+absl-py==2.4.0
+certifi==2026.5.20
+cffi==2.0.0
+contourpy==1.3.3
+cycler==0.12.1
+flatbuffers==25.12.19
+fonttools==4.63.0
+kiwisolver==1.5.0
+matplotlib==3.10.9
+mediapipe==0.10.35
+numpy==2.4.6
+opencv-contrib-python==4.13.0.92
+opencv-python==4.13.0.92
+packaging==26.2
+pillow==12.2.0
+pycparser==3.0
+pygame==2.6.1
+pyparsing==3.3.2
+python-dateutil==2.9.0.post0
+six==1.17.0
+sounddevice==0.5.5
