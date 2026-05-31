@@ -1,10 +1,7 @@
 """
-main.py — MoodSync (Day 4): live pygame dashboard + emotion + gestures + music.
-
-The dashboard window runs on the MAIN thread (required on macOS).
-Emotion and gesture detection run as background threads writing to shared state.
-This loop reads state, drives the music, and draws the dashboard ~30fps.
-Run:  python main.py    (close the window or Ctrl+C to stop)
+main.py — MoodSync (Day 4+): shared camera, dashboard WITH live video feed.
+One Camera reads frames; emotion + gesture threads and the dashboard all use it.
+Run:  python main.py    (close window or Ctrl+C to stop)
 """
 import os
 import time
@@ -12,10 +9,13 @@ import random
 import threading
 from collections import deque
 
+import cv2
+import numpy as np
 import pygame
 
 from state import SharedState
 from fusion import playlist_for_mood
+from camera import Camera
 from inputs.emotion import run_emotion_thread
 from inputs.gestures import run_gesture_thread
 
@@ -25,18 +25,17 @@ HOLD = 3
 OVERRIDE = 10
 FPS = 30
 
-W, H = 900, 560
+W, H = 980, 620
 BG = (18, 18, 24)
 FG = (235, 235, 245)
 DIM = (120, 120, 140)
 
 MOOD_COLORS = {
-    "happy":     (255, 205, 60),
-    "sad":       (90, 130, 230),
-    "angry":     (230, 70, 70),
-    "surprised": (200, 120, 230),
-    "neutral":   (130, 140, 160),
+    "happy": (255, 205, 60), "sad": (90, 130, 230), "angry": (230, 70, 70),
+    "surprised": (200, 120, 230), "neutral": (130, 140, 160),
 }
+
+VIDEO_W, VIDEO_H = 360, 270
 
 
 def list_tracks(p):
@@ -58,6 +57,14 @@ def play_from(p, state):
     state.update(is_playing=True, current_track=os.path.basename(t), current_playlist=p)
 
 
+def frame_to_surface(frame):
+    """BGR numpy frame -> pygame surface, resized for the panel."""
+    frame = cv2.resize(frame, (VIDEO_W, VIDEO_H))
+    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    frame = np.rot90(frame)            # pygame surfarray expects this orientation
+    return pygame.surfarray.make_surface(frame)
+
+
 def main():
     state = SharedState()
     pygame.init()
@@ -65,22 +72,24 @@ def main():
     screen = pygame.display.set_mode((W, H))
     pygame.display.set_caption("MoodSync")
     clock = pygame.time.Clock()
-    f_big = pygame.font.SysFont("Helvetica", 64, bold=True)
-    f_med = pygame.font.SysFont("Helvetica", 28)
-    f_sm = pygame.font.SysFont("Helvetica", 20)
+    f_big = pygame.font.SysFont("Helvetica", 60, bold=True)
+    f_med = pygame.font.SysFont("Helvetica", 26)
+    f_sm = pygame.font.SysFont("Helvetica", 18)
+
+    camera = Camera().start()
 
     stop = threading.Event()
     threading.Thread(target=run_emotion_thread,
-                     kwargs={"state": state, "show_window": False, "stop_event": stop},
+                     kwargs={"state": state, "camera": camera, "stop_event": stop},
                      daemon=True).start()
     threading.Thread(target=run_gesture_thread,
-                     kwargs={"state": state, "stop_event": stop},
+                     kwargs={"state": state, "camera": camera, "stop_event": stop},
                      daemon=True).start()
 
     play_from(state.snapshot().current_playlist, state)
 
     ws, wp, last_g = None, None, 0.0
-    mood_history = deque(maxlen=120)  # for the timeline graph
+    mood_history = deque(maxlen=130)
     last_sample = 0.0
 
     running = True
@@ -93,7 +102,6 @@ def main():
             s = state.snapshot()
             pygame.mixer.music.set_volume(s.volume)
 
-            # handle gesture events
             if s.gesture_updated_at > last_g:
                 last_g = s.gesture_updated_at
                 g = s.last_gesture
@@ -104,7 +112,6 @@ def main():
                 elif g == "palm_open":
                     pygame.mixer.music.unpause(); state.update(is_playing=True)
 
-            # mood-driven playlist switch
             manual = (time.time() - s.last_manual_command_at) < OVERRIDE
             target = playlist_for_mood(s.mood)
             if not manual and target != s.current_playlist:
@@ -115,7 +122,6 @@ def main():
             else:
                 wp, ws = None, None
 
-            # sample mood for timeline (~2/sec)
             if time.time() - last_sample > 0.5:
                 mood_history.append(s.mood)
                 last_sample = time.time()
@@ -124,37 +130,38 @@ def main():
             screen.fill(BG)
             mood_color = MOOD_COLORS.get(s.mood, DIM)
 
-            # mood (big)
             screen.blit(f_sm.render("MOOD", True, DIM), (40, 30))
-            screen.blit(f_big.render(s.mood.upper(), True, mood_color), (40, 50))
+            screen.blit(f_big.render(s.mood.upper(), True, mood_color), (40, 48))
 
-            # current track / playlist
-            screen.blit(f_sm.render("NOW PLAYING", True, DIM), (40, 150))
-            track = s.current_track or "(nothing)"
-            screen.blit(f_med.render(track, True, FG), (40, 172))
-            screen.blit(f_sm.render("playlist: " + s.current_playlist, True, DIM), (40, 208))
+            screen.blit(f_sm.render("NOW PLAYING", True, DIM), (40, 140))
+            screen.blit(f_med.render(s.current_track or "(nothing)", True, FG), (40, 162))
+            screen.blit(f_sm.render("playlist: " + s.current_playlist, True, DIM), (40, 196))
 
-            # play/pause + last gesture
             status = "PLAYING" if s.is_playing else "PAUSED"
-            screen.blit(f_med.render(status, True, FG), (640, 50))
-            screen.blit(f_sm.render("last gesture: " + (s.last_gesture or "-"), True, DIM), (640, 90))
+            screen.blit(f_med.render(status, True, FG), (40, 232))
+            screen.blit(f_sm.render("last gesture: " + (s.last_gesture or "-"), True, DIM), (40, 266))
 
-            # volume bar
-            screen.blit(f_sm.render("VOLUME", True, DIM), (40, 250))
-            pygame.draw.rect(screen, (45, 45, 55), (40, 275, 500, 24), border_radius=12)
-            pygame.draw.rect(screen, mood_color, (40, 275, int(500 * s.volume), 24), border_radius=12)
-            screen.blit(f_sm.render("%d%%" % int(s.volume * 100), True, FG), (555, 274))
+            screen.blit(f_sm.render("VOLUME", True, DIM), (40, 304))
+            pygame.draw.rect(screen, (45, 45, 55), (40, 328, 480, 22), border_radius=11)
+            pygame.draw.rect(screen, mood_color, (40, 328, int(480 * s.volume), 22), border_radius=11)
+            screen.blit(f_sm.render("%d%%" % int(s.volume * 100), True, FG), (532, 327))
 
-            # mood timeline (bottom)
-            screen.blit(f_sm.render("MOOD TIMELINE", True, DIM), (40, 340))
-            base_y = 480
-            bar_w = 6
+            screen.blit(f_sm.render("MOOD TIMELINE", True, DIM), (40, 380))
+            base_y = 470
             for i, m in enumerate(mood_history):
                 c = MOOD_COLORS.get(m, DIM)
-                x = 40 + i * (bar_w + 1)
-                pygame.draw.rect(screen, c, (x, base_y - 60, bar_w, 60))
+                pygame.draw.rect(screen, c, (40 + i * 5, base_y - 55, 4, 55))
 
-            screen.blit(f_sm.render("close window or Ctrl+C to quit", True, DIM), (40, H - 30))
+            # live video panel (top-right)
+            frame = camera.read()
+            vx, vy = W - VIDEO_W - 40, 40
+            if frame is not None:
+                surf = frame_to_surface(frame)
+                screen.blit(surf, (vx, vy))
+            pygame.draw.rect(screen, DIM, (vx, vy, VIDEO_W, VIDEO_H), 2)
+            screen.blit(f_sm.render("CAMERA", True, DIM), (vx, vy - 24))
+
+            screen.blit(f_sm.render("close window or Ctrl+C to quit", True, DIM), (40, H - 28))
 
             pygame.display.flip()
             clock.tick(FPS)
@@ -162,6 +169,7 @@ def main():
         pass
     finally:
         stop.set()
+        camera.stop()
         pygame.mixer.music.stop()
         pygame.quit()
         time.sleep(0.3)

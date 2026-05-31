@@ -1,3 +1,7 @@
+"""
+inputs/gestures.py — hand gestures reading from a shared Camera.
+Writes volume (continuous) + gesture events to shared state.
+"""
 import os
 os.environ["GLOG_minloglevel"] = "3"
 
@@ -10,7 +14,6 @@ from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 
 MODEL_PATH = "hand_landmarker.task"
-CAMERA_INDEX = 1
 SWIPE_COOLDOWN = 1.0
 SWIPE_MIN_DX = 0.25
 
@@ -27,35 +30,28 @@ def _count_extended(lm):
     return n
 
 
-def run_gesture_thread(state, stop_event=None):
+def run_gesture_thread(state, camera, stop_event=None):
     base = python.BaseOptions(model_asset_path=MODEL_PATH)
     options = vision.HandLandmarkerOptions(
         base_options=base, num_hands=1,
-        running_mode=vision.RunningMode.IMAGE,
-    )
+        running_mode=vision.RunningMode.IMAGE)
     landmarker = vision.HandLandmarker.create_from_options(options)
-
-    cap = cv2.VideoCapture(CAMERA_INDEX)
-    if not cap.isOpened():
-        print("[gestures] Could not open camera index", CAMERA_INDEX)
-        return
 
     prev_open = None
     last_swipe_time = 0.0
     x_history = deque(maxlen=6)
 
     while stop_event is None or not stop_event.is_set():
-        ok, frame = cap.read()
-        if not ok:
+        frame = camera.read()
+        if frame is None:
+            time.sleep(0.03)
             continue
-
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
         result = landmarker.detect(mp_image)
 
         if result.hand_landmarks:
             lm = result.hand_landmarks[0]
-
             height = 1.0 - lm[WRIST].y
             vol = max(0.0, min(1.0, height))
             state.update(volume=round(vol, 2))
@@ -76,7 +72,4 @@ def run_gesture_thread(state, stop_event=None):
         else:
             prev_open = None
             x_history.clear()
-
         time.sleep(0.03)
-
-    cap.release()
