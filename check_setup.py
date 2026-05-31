@@ -29,9 +29,16 @@ def check_webcam():
         print("  [FAIL] Could not open the webcam (is another app using it?)")
         return False
 
-    ok, frame = cap.read()
-    if not ok or frame is None:
-        print("  [FAIL] Camera opened but returned no frame")
+    # Macs often return empty frames for the first moment while the camera
+    # wakes up. Give it a few tries before giving up.
+    frame = None
+    for _ in range(30):
+        ok, frame = cap.read()
+        if ok and frame is not None:
+            break
+        time.sleep(0.1)
+    else:
+        print("  [FAIL] Camera opened but never returned a frame")
         cap.release()
         return False
 
