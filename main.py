@@ -1,93 +1,73 @@
-import os
-import time
-import random
-import threading
-
+import os, time, random, threading
 import pygame
-
 from state import SharedState
 from fusion import playlist_for_mood
 from inputs.emotion import run_emotion_thread
+from inputs.gestures import run_gesture_thread
 
 MUSIC_DIR = "music"
-FRAMES_PER_SECOND = 4
-AUDIO_EXTENSIONS = (".mp3", ".wav", ".ogg")
-SWITCH_HOLD_SECONDS = 3
+FPS = 8
+EXTS = (".mp3", ".wav", ".ogg")
+HOLD = 3
+OVERRIDE = 10
 
-
-def list_tracks(playlist):
-    folder = os.path.join(MUSIC_DIR, playlist)
-    if not os.path.isdir(folder):
+def list_tracks(p):
+    d = os.path.join(MUSIC_DIR, p)
+    if not os.path.isdir(d):
         return []
-    return [os.path.join(folder, f) for f in sorted(os.listdir(folder))
-            if f.lower().endswith(AUDIO_EXTENSIONS)]
+    return [os.path.join(d, f) for f in sorted(os.listdir(d)) if f.lower().endswith(EXTS)]
 
-
-def play_from(playlist, state):
-    tracks = list_tracks(playlist)
-    if not tracks:
-        print("[!] No songs in music/" + playlist + "/ - add some.")
-        state.update(is_playing=False, current_track="", current_playlist=playlist)
+def play_from(p, state):
+    tr = list_tracks(p)
+    if not tr:
+        print("[!] No songs in music/" + p + "/")
+        state.update(is_playing=False, current_track="", current_playlist=p)
         return
-    track = random.choice(tracks)
-    pygame.mixer.music.load(track)
+    t = random.choice(tr)
+    pygame.mixer.music.load(t)
     pygame.mixer.music.set_volume(state.snapshot().volume)
     pygame.mixer.music.play()
-    state.update(is_playing=True, current_track=os.path.basename(track),
-                 current_playlist=playlist)
-    print("[+] (" + playlist + ") playing: " + os.path.basename(track))
-
+    state.update(is_playing=True, current_track=os.path.basename(t), current_playlist=p)
+    print("[+] (" + p + ") " + os.path.basename(t))
 
 def main():
     state = SharedState()
     pygame.mixer.init()
-
-    stop_event = threading.Event()
-    t = threading.Thread(
-        target=run_emotion_thread,
-        kwargs={"state": state, "show_window": False, "stop_event": stop_event},
-        daemon=True,
-    )
-    t.start()
-    print("[emotion] thread started - a webcam window will open.")
-
+    stop = threading.Event()
+    threading.Thread(target=run_emotion_thread, kwargs={"state": state, "show_window": False, "stop_event": stop}, daemon=True).start()
+    threading.Thread(target=run_gesture_thread, kwargs={"state": state, "stop_event": stop}, daemon=True).start()
+    print("[threads] started.")
     play_from(state.snapshot().current_playlist, state)
-
-    wanted_since = None
-    wanted_playlist = None
-
-    print("Main loop running (Ctrl+C to stop). Make faces at the camera!")
+    ws, wp, last_g = None, None, 0.0
+    print("Running (Ctrl+C to stop). Make faces / use your hand!")
     try:
         while True:
             s = state.snapshot()
+            pygame.mixer.music.set_volume(s.volume)
+            if s.gesture_updated_at > last_g:
+                last_g = s.gesture_updated_at
+                g = s.last_gesture
+                if g in ("swipe_left", "swipe_right"):
+                    print("[gesture] next"); play_from(s.current_playlist, state)
+                elif g == "palm_closed":
+                    print("[gesture] pause"); pygame.mixer.music.pause(); state.update(is_playing=False)
+                elif g == "palm_open":
+                    print("[gesture] play"); pygame.mixer.music.unpause(); state.update(is_playing=True)
+            manual = (time.time() - s.last_manual_command_at) < OVERRIDE
             target = playlist_for_mood(s.mood)
-
-            if target != s.current_playlist:
-                if wanted_playlist != target:
-                    wanted_playlist = target
-                    wanted_since = time.time()
-                elif time.time() - wanted_since >= SWITCH_HOLD_SECONDS:
-                    play_from(target, state)
-                    wanted_playlist = None
-                    wanted_since = None
+            if not manual and target != s.current_playlist:
+                if wp != target:
+                    wp, ws = target, time.time()
+                elif time.time() - ws >= HOLD:
+                    play_from(target, state); wp, ws = None, None
             else:
-                wanted_playlist = None
-                wanted_since = None
-
-            line = "mood=" + s.mood + " -> want=" + target
-            line += " | now=" + s.current_playlist + " track=" + s.current_track
-            print(line)
-
-            time.sleep(1.0 / FRAMES_PER_SECOND)
+                wp, ws = None, None
+            print("mood=" + s.mood + " want=" + target + " now=" + s.current_playlist + " vol=" + ("%.2f" % s.volume) + " playing=" + str(s.is_playing))
+            time.sleep(1.0 / FPS)
     except KeyboardInterrupt:
         print("Stopping...")
     finally:
-        stop_event.set()
-        pygame.mixer.music.stop()
-        pygame.mixer.quit()
-        time.sleep(0.3)
-        print("Clean exit.")
-
+        stop.set(); pygame.mixer.music.stop(); pygame.mixer.quit(); time.sleep(0.3); print("Clean exit.")
 
 if __name__ == "__main__":
     main()
