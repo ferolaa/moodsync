@@ -1,7 +1,7 @@
 """
-main.py — MoodSync (Day 4+): shared camera, dashboard WITH live video feed.
-One Camera reads frames; emotion + gesture threads and the dashboard all use it.
-Run:  python main.py    (close window or Ctrl+C to stop)
+main.py — MoodSync: mood-driven playlist switching + gestures + dashboard w/ video.
+Mood changes the playlist within ~1 second. Gestures: volume / play-pause / next.
+Run:  python main.py
 """
 import os
 import time
@@ -21,20 +21,19 @@ from inputs.gestures import run_gesture_thread
 
 MUSIC_DIR = "music"
 EXTS = (".mp3", ".wav", ".ogg")
-HOLD = 3
-OVERRIDE = 10
+HOLD_INTO_EMOTION = 1.0   # fast: switching INTO happy/sad/hype
+HOLD_TO_NEUTRAL = 2.0     # slow: relaxing back to neutral/chill
+OVERRIDE = 8            # after a manual gesture, pause mood-switching this long
 FPS = 30
 
 W, H = 980, 620
 BG = (18, 18, 24)
 FG = (235, 235, 245)
 DIM = (120, 120, 140)
-
 MOOD_COLORS = {
     "happy": (255, 205, 60), "sad": (90, 130, 230), "angry": (230, 70, 70),
     "surprised": (200, 120, 230), "neutral": (130, 140, 160),
 }
-
 VIDEO_W, VIDEO_H = 360, 270
 
 
@@ -58,10 +57,9 @@ def play_from(p, state):
 
 
 def frame_to_surface(frame):
-    """BGR numpy frame -> pygame surface, resized for the panel."""
     frame = cv2.resize(frame, (VIDEO_W, VIDEO_H))
     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    frame = np.rot90(frame)            # pygame surfarray expects this orientation
+    frame = np.rot90(frame)
     return pygame.surfarray.make_surface(frame)
 
 
@@ -77,7 +75,6 @@ def main():
     f_sm = pygame.font.SysFont("Helvetica", 18)
 
     camera = Camera().start()
-
     stop = threading.Event()
     threading.Thread(target=run_emotion_thread,
                      kwargs={"state": state, "camera": camera, "stop_event": stop},
@@ -88,7 +85,7 @@ def main():
 
     play_from(state.snapshot().current_playlist, state)
 
-    ws, wp, last_g = None, None, 0.0
+    wp, ws, last_g = None, None, 0.0
     mood_history = deque(maxlen=130)
     last_sample = 0.0
 
@@ -102,6 +99,7 @@ def main():
             s = state.snapshot()
             pygame.mixer.music.set_volume(s.volume)
 
+            # gestures
             if s.gesture_updated_at > last_g:
                 last_g = s.gesture_updated_at
                 g = s.last_gesture
@@ -112,12 +110,14 @@ def main():
                 elif g == "palm_open":
                     pygame.mixer.music.unpause(); state.update(is_playing=True)
 
+            # mood -> playlist; INTO an emotion is fast, back TO neutral is slow
             manual = (time.time() - s.last_manual_command_at) < OVERRIDE
             target = playlist_for_mood(s.mood)
+            hold = HOLD_TO_NEUTRAL if target == "chill" else HOLD_INTO_EMOTION
             if not manual and target != s.current_playlist:
                 if wp != target:
                     wp, ws = target, time.time()
-                elif time.time() - ws >= HOLD:
+                elif time.time() - ws >= hold:
                     play_from(target, state); wp, ws = None, None
             else:
                 wp, ws = None, None
@@ -126,12 +126,11 @@ def main():
                 mood_history.append(s.mood)
                 last_sample = time.time()
 
-            # ---------- draw ----------
+            # draw
             screen.fill(BG)
-            mood_color = MOOD_COLORS.get(s.mood, DIM)
-
+            mc = MOOD_COLORS.get(s.mood, DIM)
             screen.blit(f_sm.render("MOOD", True, DIM), (40, 30))
-            screen.blit(f_big.render(s.mood.upper(), True, mood_color), (40, 48))
+            screen.blit(f_big.render(s.mood.upper(), True, mc), (40, 48))
 
             screen.blit(f_sm.render("NOW PLAYING", True, DIM), (40, 140))
             screen.blit(f_med.render(s.current_track or "(nothing)", True, FG), (40, 162))
@@ -143,26 +142,21 @@ def main():
 
             screen.blit(f_sm.render("VOLUME", True, DIM), (40, 304))
             pygame.draw.rect(screen, (45, 45, 55), (40, 328, 480, 22), border_radius=11)
-            pygame.draw.rect(screen, mood_color, (40, 328, int(480 * s.volume), 22), border_radius=11)
+            pygame.draw.rect(screen, mc, (40, 328, int(480 * s.volume), 22), border_radius=11)
             screen.blit(f_sm.render("%d%%" % int(s.volume * 100), True, FG), (532, 327))
 
             screen.blit(f_sm.render("MOOD TIMELINE", True, DIM), (40, 380))
-            base_y = 470
             for i, m in enumerate(mood_history):
-                c = MOOD_COLORS.get(m, DIM)
-                pygame.draw.rect(screen, c, (40 + i * 5, base_y - 55, 4, 55))
+                pygame.draw.rect(screen, MOOD_COLORS.get(m, DIM), (40 + i * 5, 415, 4, 55))
 
-            # live video panel (top-right)
             frame = camera.read()
             vx, vy = W - VIDEO_W - 40, 40
             if frame is not None:
-                surf = frame_to_surface(frame)
-                screen.blit(surf, (vx, vy))
+                screen.blit(frame_to_surface(frame), (vx, vy))
             pygame.draw.rect(screen, DIM, (vx, vy, VIDEO_W, VIDEO_H), 2)
             screen.blit(f_sm.render("CAMERA", True, DIM), (vx, vy - 24))
 
             screen.blit(f_sm.render("close window or Ctrl+C to quit", True, DIM), (40, H - 28))
-
             pygame.display.flip()
             clock.tick(FPS)
     except KeyboardInterrupt:

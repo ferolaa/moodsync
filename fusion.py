@@ -3,12 +3,11 @@ fusion.py — turns a detected mood into a playlist choice.
 This is the 'multimodal fusion' rule layer (simple + rule-based on purpose).
 """
 
-# detected moods: happy / sad / angry / neutral / surprised
+# detected moods: happy / sad / surprised / neutral
 # playlists:      happy / sad / chill / hype
 MOOD_TO_PLAYLIST = {
     "happy":     "happy",
     "sad":       "sad",
-    "angry":     "hype",
     "surprised": "hype",
     "neutral":   "chill",
 }

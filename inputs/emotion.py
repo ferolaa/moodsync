@@ -1,6 +1,6 @@
 """
 inputs/emotion.py — emotion detection reading from a shared Camera.
-Writes mood to shared state. No longer opens its own camera.
+Detects: happy / sad / surprised / neutral. (Angry removed — unreliable.)
 """
 import os
 os.environ["GLOG_minloglevel"] = "3"
@@ -27,13 +27,10 @@ def _score(bs, name):
 def _classify(bs):
     smile = (_score(bs, "mouthSmileLeft") + _score(bs, "mouthSmileRight")) / 2
     frown = (_score(bs, "mouthFrownLeft") + _score(bs, "mouthFrownRight")) / 2
-    brow_down = (_score(bs, "browDownLeft") + _score(bs, "browDownRight")) / 2
     jaw_open = _score(bs, "jawOpen")
     brow_up = _score(bs, "browInnerUp")
     if smile > 0.4:
         return "happy", smile
-    if brow_down > 0.4:
-        return "angry", brow_down
     if jaw_open > 0.4 and brow_up > 0.3:
         return "surprised", jaw_open
     if frown > 0.2:
