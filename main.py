@@ -140,7 +140,10 @@ def main():
             screen.fill(BG)
             mc = MOOD_COLORS.get(s.mood, DIM)
             screen.blit(f_sm.render("MOOD", True, DIM), (40, 30))
-            screen.blit(f_big.render(s.mood.upper(), True, mc), (40, 48))
+            mood_text = s.mood.upper()
+            if not s.face_tracking:
+                mood_text += " (LOCKED)"
+            screen.blit(f_big.render(mood_text, True, mc), (40, 48))
 
             screen.blit(f_sm.render("NOW PLAYING", True, DIM), (40, 140))
             screen.blit(f_med.render(s.current_track or "(nothing)", True, FG), (40, 162))

@@ -30,6 +30,7 @@ class AppState:
     voice_updated_at: float = 0.0
 
     movement_level: float = 0.0
+    face_tracking: bool = True
 
     # --- Player: written by the main loop / audio module ---
     volume: float = 0.6
@@ -62,6 +63,9 @@ class SharedState:
     def set_mood(self, mood, confidence):
         self.update(mood=mood, mood_confidence=confidence,
                     mood_updated_at=time.time())
+
+    def set_face_tracking(self, enabled):
+        self.update(face_tracking=enabled)
 
     def set_gesture(self, gesture):
         self.update(last_gesture=gesture, gesture_updated_at=time.time(),

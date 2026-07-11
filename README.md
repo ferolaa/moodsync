@@ -29,10 +29,10 @@ The webcam also tracks one hand:
 - **Open palm** → play
 - **Closed fist** → pause
 - **Swipe** left or right → next song
+- **Thumb up/down** → fix the mood
 
 If you use a hand gesture, the app stops auto-changing the music for a few seconds,
-so your manual choice isn't immediately overridden by your mood. (This is the
-"fusion" rule — your direct command wins over the automatic behavior.)
+so your manual choice isn't immediately overridden by your mood. 
 
 **A live dashboard shows everything.**
 A window displays your current mood (in big colored text), the song playing, a
@@ -41,26 +41,6 @@ feed, and an emoji that matches your mood.
 
 ---
 
-## How it works (the simple version)
-
-Three things run at the same time:
-
-1. An **emotion reader** watches the camera and writes your mood down.
-2. A **gesture reader** watches the camera and writes your hand actions down.
-3. The **main program** reads what those two wrote and changes the music + draws
-   the dashboard.
-
-They all share **one camera** and **one shared notebook** (called the "state").
-The readers only *write* to the notebook; the main program only *reads* from it.
-This keeps everything simple and avoids conflicts.
-
-It uses **MediaPipe** (Google's free vision tool) to read the face and hands —
-no internet, no training, no AI servers. The mood is decided by simple rules
-(big smile = happy, etc.).
-
----
-
-## What's in the project
 
 ```
 moodsync/
@@ -83,18 +63,8 @@ moodsync/
 
 ---
 
-## Setup (step by step)
-
-You need a Mac with a webcam. These steps assume you're starting fresh.
-
 **1. Use Python 3.11.**
-Newer Python versions don't work well with the vision libraries. If you have
-[Homebrew](https://brew.sh):
-
-```bash
-brew install python@3.11
-```
-
+Newer Python versions don't work well with the vision libraries.
 **2. Get the code and make a clean environment.**
 
 ```bash
@@ -177,12 +147,3 @@ video, your webcam might be camera **0** instead. Change `CAMERA_INDEX = 1` to
   (the music adapting to your mood).
 
 ---
-
-## Known limits
-
-- Emotion is detected by simple rules from face shape, not a trained emotion model,
-  so it works best with clear expressions and good lighting.
-- *Angry* was removed because it was hard to detect reliably; the app uses four
-  moods (happy, sad, surprised, neutral).
-- The music swaps songs to match the mood; it does not change the audio of a single
-  song in real time.

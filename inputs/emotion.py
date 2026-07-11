@@ -33,8 +33,8 @@ def _classify(bs):
         return "happy", smile
     if jaw_open > 0.4 and brow_up > 0.3:
         return "surprised", jaw_open
-    if frown > 0.2:
-        return "sad", frown
+    if frown > 0.05 or brow_up > 0.2:
+        return "sad", max(frown, brow_up)
     return "neutral", 0.5
 
 
@@ -47,6 +47,10 @@ def run_emotion_thread(state, camera, stop_event=None):
 
     recent = deque(maxlen=SMOOTH_WINDOW)
     while stop_event is None or not stop_event.is_set():
+        if not state.snapshot().face_tracking:
+            time.sleep(0.1)
+            continue
+            
         frame = camera.read()
         if frame is None:
             time.sleep(0.03)

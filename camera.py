@@ -6,7 +6,7 @@ This avoids multiple components fighting over the same webcam (a macOS issue).
 import threading
 import cv2
 
-CAMERA_INDEX = 1
+CAMERA_INDEX = 0
 
 
 class Camera:
