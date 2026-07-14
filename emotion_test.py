@@ -1,7 +1,6 @@
 """
 emotion_test.py — MediaPipe face -> simple emotion, live from webcam.
 Rule-based: reads facial 'blendshapes' and maps them to a mood.
-Run:  python emotion_test.py   — press q to quit.
 """
 import os
 os.environ["GLOG_minloglevel"] = "3"

@@ -17,7 +17,7 @@ results = {}
 
 
 def check_webcam():
-    """Open camera 0, grab a frame, show it for ~2 seconds."""
+    # Open camera 0, grab a frame, show it for ~2 seconds.
     try:
         import cv2
     except ImportError:
@@ -57,7 +57,7 @@ def check_webcam():
 
 
 def check_microphone():
-    """Record 2 seconds and report the input level."""
+    # Record 2 seconds and report the input level.
     try:
         import sounddevice as sd
         import numpy as np
@@ -84,7 +84,7 @@ def check_microphone():
 
 
 def check_speakers():
-    """Play a short 440 Hz beep so you can confirm you hear it."""
+    # Play a short 440 Hz beep so you can confirm you hear it.
     try:
         import sounddevice as sd
         import numpy as np

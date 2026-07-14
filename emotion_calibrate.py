@@ -1,11 +1,4 @@
-"""
-emotion_calibrate.py — shows the RAW facial scores the classifier uses,
-so we can set thresholds that fit YOUR face.
-
-Run:  python emotion_calibrate.py
-Make each expression and watch the numbers. Press q to quit.
-Tell Claude the values you see for SAD and ANGRY faces especially.
-"""
+# Shows the RAW facial scores the classifier uses, so we can set thresholds that fit YOUR face.
 import os
 os.environ["GLOG_minloglevel"] = "3"
 

@@ -1,7 +1,6 @@
 """
-make_emojis.py — generate emoji PNGs from the macOS color emoji font.
+Generates emoji PNGs from the macOS color emoji font.
 Creates emojis/happy.png, sad.png, surprised.png, neutral.png (transparent).
-Run:  python make_emojis.py
 """
 import os
 from PIL import Image, ImageFont, ImageDraw
@@ -19,7 +18,7 @@ EMOJI = {
 
 
 def load_font():
-    """Apple Color Emoji only allows specific sizes; try the known good ones."""
+    # Apple Color Emoji only allows specific sizes; these are the known good ones
     for px in (160, 96, 137, 109, 128):
         try:
             return ImageFont.truetype(FONT_PATH, px)

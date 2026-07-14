@@ -1,5 +1,5 @@
 """
-state.py  —  MoodSync shared state (THE CONTRACT)
+MoodSync shared state
 
 Input threads (emotion / gesture / voice) only WRITE to this.
 The main loop only READS from it via snapshot(). That split is the fusion layer.
@@ -43,8 +43,6 @@ class AppState:
 
 
 class SharedState:
-    """Thread-safe wrapper around AppState."""
-
     def __init__(self):
         self._state = AppState()
         self._lock = threading.Lock()

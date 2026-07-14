@@ -34,7 +34,7 @@ class Camera:
                     self._frame = frame
 
     def read(self):
-        """Return the latest frame (BGR numpy array) or None."""
+        # Return the latest frame (BGR numpy array) or None
         with self._lock:
             return None if self._frame is None else self._frame.copy()
 

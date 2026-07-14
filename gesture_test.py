@@ -1,6 +1,6 @@
 """
-gesture_test.py — MediaPipe Hands, live gesture read from webcam.
-Shows: extended-finger count, open/closed, hand height. Press q to quit.
+MediaPipe Hands, live gesture read from webcam.
+Shows: extended-finger count, open/closed, hand height.
 """
 import os
 os.environ["GLOG_minloglevel"] = "3"
